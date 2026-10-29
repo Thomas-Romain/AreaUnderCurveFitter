@@ -1,0 +1,325 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Oct 27 19:11:17 2026
+
+@author: bn23289
+"""
+
+################TODO: New ReCalc function
+
+import sys
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QGridLayout, QMainWindow, QApplication, QTextEdit, QLineEdit,  QWidget, QTabWidget, QVBoxLayout, QLabel,QPushButton, QMessageBox
+import numpy as np
+import matplotlib.pyplot as plt
+import pyqtgraph as pg
+from scipy.integrate import simpson
+
+def ImportFile(File):
+    try:
+        if File.rsplit('.', 1)[1] == "csv":
+            print("OK!")
+            Data = np.genfromtxt(File, delimiter=',', skip_header = 1)
+        if File.rsplit('.',1)[1] == 'txt':
+            Data = np.genfromtxt(rf"{File}")
+        Temperature = Data[:,0]
+    except Exception as e:
+                     print(f"Error! {e}")
+                     print("Check filetype before running again")
+    return Data[:,1], Temperature
+
+def BaseAdjust(Base1,Base2, Temperature,Data):
+    if Base1 > Temperature[0] and Base2>Temperature[0]:
+        print(Temperature[0])
+        Data = Data[:,1]
+        plt.axvline(Base1,color='black', lw=0.9)
+        plt.axvline(Base2,color='black', lw=0.9)
+        if Base1<Base2:
+            Data = Data-np.mean(Data[np.where(Temperature >= Base1)[0]:np.where(Temperature >= Base2)[0]]) ####Adjusting 
+        if Base1>Base2:
+            Data = Data-np.mean(Data[np.where(Temperature >= Base2)[0]:np.where(Temperature >= Base1)[0]]) ####Adjusting      
+        if Base1==Base2:
+            Data = Data-np.mean(Data[0:10])
+            print("Error with input 'Base', make sure Base1 < Base 2")
+    else:
+        Data = Data
+        print("Error with baseline adjustment")
+    plt.axvspan(Base1, Base2, alpha=0.2, lw=0, color = 'black')
+    return Data
+
+def CalcArea(Peak1,Peak2,Data,Temperature):
+    return simpson(Data[np.where(Temperature >= Peak1)[0][0]:np.where(Temperature >= Peak2)[0][0]], dx=5)        
+
+# Creating the main window     
+class App(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.title = 'Area plotting'
+        self.setWindowTitle(self.title)
+        self.setGeometry(100, 100, 100, 100)
+        self.setFixedWidth(1200)
+        self.setFixedHeight(800)
+        self.tab_widget = MyTabWidget(self)
+        self.setCentralWidget(self.tab_widget)
+        self.show()
+
+class MyTabWidget(QWidget):
+    def __init__(self, parent):
+        super(QWidget, self).__init__(parent)
+        self.layout = QVBoxLayout(self)
+        
+        #define tabs
+        self.tabs = QTabWidget()
+        self.tab1 = QWidget()
+
+        #add tabbs
+        self.tabs.addTab(self.tab1, "Graph stuff")
+       
+        #Submit button
+        self.SubmitButton2 = QPushButton("Plot graph", self)
+        self.SubmitButton2.clicked.connect(self.submit2)  
+        self.SubmitButtonReCalc = QPushButton("Recalculate",self)
+        self.SubmitButtonReCalc.clicked.connect(self.ReCalc)
+        
+        #Combobox1
+        self.combobox = QComboBox(self)
+        self.combobox.addItem('1')
+        self.combobox.addItem('2')
+        self.combobox.addItem('3')
+        self.combobox.addItem('4')
+        self.combobox.addItem('5')
+        self.combobox.addItem('6')
+        self.combobox.addItem('7')
+        
+        #Linedit0 file link
+        self.line_edit = QLineEdit(r'C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\DSC\PythonAreaTest.txt', self)
+        
+        #Lineedittab1
+        self.LEBase1 = QLineEdit("45",self)
+        self.LEBase2 = QLineEdit("50",self)
+        self.LEBase1.setInputMask("000")
+        self.LEBase2.setInputMask("000")
+        
+        #Lineedit1
+        self.LEPeak1_1 = QLineEdit("50",    self)
+        self.LEPeak1_2 = QLineEdit("55",    self)
+        self.LEPeak2_1 = QLineEdit("60",    self)
+        self.LEPeak2_2 = QLineEdit("65",    self)
+        self.LEPeak3_1 = QLineEdit("70",    self)
+        self.LEPeak3_2 = QLineEdit("75",    self)
+        self.LEPeak4_1 = QLineEdit("80",    self)
+        self.LEPeak4_2 = QLineEdit("85",    self)
+        self.LEPeak5_1 = QLineEdit("90",    self)
+        self.LEPeak5_2 = QLineEdit("95",    self)
+        self.LEPeak6_1 = QLineEdit("100",    self)
+        self.LEPeak6_2 = QLineEdit("105",    self)
+        self.LEPeak7_1 = QLineEdit("110",    self)
+        self.LEPeak7_2 = QLineEdit("120",    self)
+
+        
+        #Masks
+        self.LEPeak1_1.setInputMask("000")
+        self.LEPeak1_2.setInputMask("000")
+        self.LEPeak2_1.setInputMask("000")
+        self.LEPeak2_2.setInputMask("000")
+        self.LEPeak3_1.setInputMask("000")
+        self.LEPeak3_2.setInputMask("000")
+        self.LEPeak4_1.setInputMask("000")
+        self.LEPeak4_2.setInputMask("000")
+        self.LEPeak5_1.setInputMask("000")
+        self.LEPeak5_2.setInputMask("000")
+        self.LEPeak6_1.setInputMask("000")
+        self.LEPeak6_2.setInputMask("000")
+        self.LEPeak7_1.setInputMask("000")
+        self.LEPeak7_2.setInputMask("000")
+
+        
+        #Peak labels
+        self.l1 = QLabel("File link here")
+        self.l2 = QLabel("Number of peaks")
+        self.l3 = QLabel("Peak 1")
+        self.l4 = QLabel("Peak 2")
+        self.l5 = QLabel("Peak 3")
+        self.l6 = QLabel("Peak 4")
+        self.l7 = QLabel("Peak 5")
+        self.l8 = QLabel("Peak 6")
+        self.l9 = QLabel("Peak 7")
+        self.l10 = QLabel("Xlims")
+        self.l11 = QLabel("Ylims")
+        
+        #Areatextboxes
+        self.line_Text = QTextEdit(self)
+        self.line_Text.setReadOnly(True)
+        self.line_Text1 = QTextEdit(self)
+        self.line_Text1.setReadOnly(True)
+        self.line_Text2 = QTextEdit(self)
+        self.line_Text2.setReadOnly(True)
+        self.line_Text3 = QTextEdit(self)
+        self.line_Text3.setReadOnly(True)
+        self.line_Text4 = QTextEdit(self)
+        self.line_Text4.setReadOnly(True)
+        self.line_Text5 = QTextEdit(self)
+        self.line_Text5.setReadOnly(True)
+        self.line_Text6 = QTextEdit(self)
+        self.line_Text6.setReadOnly(True)
+        
+        ##
+        self.Xlim1 = QLineEdit("50",self)
+        self.Xlim2 = QLineEdit("120",self)
+        self.Xlim1.setInputMask("999")
+        self.Xlim2.setInputMask("999")
+        self.Ylim1 = QLineEdit("-80",self)
+        self.Ylim2 = QLineEdit("80", self)
+        self.Ylim1.setInputMask("0.99")
+        self.Ylim2.setInputMask("0.99")
+        
+        #Checkbox
+        self.Checkbox = QCheckBox("Baseline adjust?", self)
+        self.Checkbox.setChecked(True)
+        #Checkbox2
+        self.Checkbox2 = QCheckBox("Auto-adjust Y limits", self)
+        self.Checkbox2.setChecked(True)
+        
+        #LabelsTab1
+        self.BaseLabel = QLabel("Base values")
+        
+        #Plot Widget?
+        self.plot_widget = pg.PlotWidget()
+        
+
+        # Create layout
+        vbox = QGridLayout()
+        
+        vbox.addWidget(self.plot_widget, 0,4,12,2)
+        self.line_Text.setMaximumHeight(2500),self.line_Text.setMaximumWidth(5000)
+        vbox.addWidget(self.l2, 2,0)
+        vbox.addWidget(self.l3, 3,0)
+        vbox.addWidget(self.l4, 4,0)
+        vbox.addWidget(self.l5, 5,0)
+        vbox.addWidget(self.l6, 6,0)
+        vbox.addWidget(self.l7, 7,0)
+        vbox.addWidget(self.l8, 8,0)
+        vbox.addWidget(self.l9, 9,0)
+        vbox.addWidget(self.l1, 0,0)
+        vbox.addWidget(self.line_edit,0,1,1,2)
+        # self.line_edit.setMaximumHeight(25),self.line_edit.setMaximumWidth(500)
+        vbox.addWidget(self.SubmitButtonReCalc, 2,2,1,2)
+        vbox.addWidget(self.SubmitButton2,0,3)
+        vbox.addWidget(self.BaseLabel,1,0)
+        vbox.addWidget(self.LEBase1,1,1)
+        vbox.addWidget(self.LEBase2,1,2)
+        vbox.addWidget(self.Checkbox,1,3)
+
+        vbox.addWidget(self.LEPeak1_1,3,1)
+        vbox.addWidget(self.LEPeak1_2,3,2)
+        vbox.addWidget(self.LEPeak2_1,4,1)
+        vbox.addWidget(self.LEPeak2_2,4,2)
+        vbox.addWidget(self.LEPeak3_1,5,1)
+        vbox.addWidget(self.LEPeak3_2,5,2)
+        vbox.addWidget(self.LEPeak4_1,6,1)
+        vbox.addWidget(self.LEPeak4_2,6,2)
+        vbox.addWidget(self.LEPeak5_1,7,1)
+        vbox.addWidget(self.LEPeak5_2,7,2)
+        vbox.addWidget(self.LEPeak6_1,8,1)
+        vbox.addWidget(self.LEPeak6_2,8,2)
+        vbox.addWidget(self.LEPeak7_1,9,1)
+        vbox.addWidget(self.LEPeak7_2,9,2)
+        vbox.addWidget(self.combobox,2,1)
+
+        vbox.addWidget(self.line_Text,3,3)
+        self.line_Text.setMaximumHeight(25),self.line_Text.setMaximumWidth(100)
+        vbox.addWidget(self.line_Text1,4,3)
+        self.line_Text1.setMaximumHeight(25),self.line_Text1.setMaximumWidth(100)
+        vbox.addWidget(self.line_Text2,5,3)
+        self.line_Text2.setMaximumHeight(25),self.line_Text2.setMaximumWidth(100)
+        vbox.addWidget(self.line_Text3,6,3)
+        self.line_Text3.setMaximumHeight(25),self.line_Text3.setMaximumWidth(100)
+        vbox.addWidget(self.line_Text4,7,3)
+        self.line_Text4.setMaximumHeight(25),self.line_Text4.setMaximumWidth(100)
+        vbox.addWidget(self.line_Text5,8,3)
+        self.line_Text5.setMaximumHeight(25),self.line_Text5.setMaximumWidth(100)
+        vbox.addWidget(self.line_Text6,9,3)
+        self.line_Text6.setMaximumHeight(25),self.line_Text6.setMaximumWidth(100)
+        
+        vbox.addWidget(self.l10,10,0)
+        vbox.addWidget(self.Xlim1,10,1)
+        self.Xlim1.setMaximumHeight(25)
+        vbox.addWidget(self.Xlim2,10,2)
+        self.Xlim2.setMaximumHeight(25)
+        vbox.addWidget(self.l11,11,0)
+        vbox.addWidget(self.Ylim1,11,1)
+        self.Ylim1.setMaximumHeight(25)
+        vbox.addWidget(self.Ylim2,11,2)
+        self.Ylim2.setMaximumHeight(25)
+        vbox.addWidget(self.Checkbox2, 11,3)
+        self.tab1.setLayout(vbox)
+        
+        #Add tabs to layout
+        self.layout.addWidget(self.tabs)
+        self.setLayout(self.layout)
+        
+        #When combobox is changed, update the plot
+        self.combobox.currentIndexChanged.connect(self.submit2)
+        self.submit2()
+
+    def submit2(self):
+        pltt = self.plot_widget
+        pltt.clear()
+        try:
+            Data, Temperature = ImportFile(self.line_edit.text())
+            if self.Checkbox.isChecked() == True:
+                Data, Temperature = ImportFile(self.line_edit.text())
+                try:
+                    Data = Data - np.mean(Data[np.where(Temperature >= int(self.LEBase1.text()))[0][0]:np.where(Temperature >= int(self.LEBase2.text()))[0][0]])
+                except:
+                    Data = Data - np.mean(Data[0:20])
+            else:
+                Data, Temperature = ImportFile(self.line_edit.text())
+            pltt.plot(Temperature,Data)
+            pltt.setWindowTitle('Graph')
+            pltt.setLabel('left','Power?','Watts/g')
+            pltt.setLabel('bottom','Temperature','oC')
+            if self.Checkbox2.isChecked() == True:
+                pltt.setXRange(float(self.Xlim1.text()),float(self.Xlim2.text()))
+                try:
+                    pltt.setYRange(min(Data[np.where(Temperature>=int(self.Xlim1.text()))[0][0]:np.where(Temperature>=int(self.Xlim2.text()))[0][0]]),max(Data[np.where(Temperature>=int(self.Xlim1.text()))[0][0]:np.where(Temperature>=int(self.Xlim2.text()))[0][0]]))
+                except:
+                    print("Error!")
+            else:
+                pltt.setXRange(float(self.Xlim1.text()),float(self.Xlim2.text()))
+                pltt.setYRange(float(self.Ylim1.text())*-1,float(self.Ylim2.text()))
+            if int(self.combobox.currentIndex()) >= 0:
+                self.line_Text.setPlainText((f"{(CalcArea(float(self.LEPeak1_1.text()),float(self.LEPeak1_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak1_1.text()),float(self.LEPeak1_2.text())), orientation='vertical', span=(0,1),brush =(127,0,0,100)))
+            if int(self.combobox.currentIndex()) >= 1:
+                self.line_Text1.setPlainText((f"{(CalcArea(float(self.LEPeak2_1.text()),float(self.LEPeak2_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak2_1.text()),float(self.LEPeak2_2.text())), orientation='vertical', span=(0,1),brush =(179,0,0,100)))
+            if int(self.combobox.currentIndex()) >= 2:
+                self.line_Text2.setPlainText((f"{(CalcArea(float(self.LEPeak3_1.text()),float(self.LEPeak3_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak3_1.text()),float(self.LEPeak3_2.text())), orientation='vertical', span=(0,1),brush =(215,48,31,100)))
+            if int(self.combobox.currentIndex()) >= 3:
+                self.line_Text3.setPlainText((f"{(CalcArea(float(self.LEPeak4_1.text()),float(self.LEPeak4_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak4_1.text()),float(self.LEPeak4_2.text())), orientation='vertical', span=(0,1),brush =(239,101,72,100)))
+            if int(self.combobox.currentIndex()) >= 4:
+                self.line_Text4.setPlainText((f"{(CalcArea(float(self.LEPeak5_1.text()),float(self.LEPeak5_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak5_1.text()),float(self.LEPeak5_2.text())), orientation='vertical', span=(0,1),brush =(252,141,89,100)))
+            if int(self.combobox.currentIndex()) >= 5:
+                self.line_Text5.setPlainText((f"{(CalcArea(float(self.LEPeak6_1.text()),float(self.LEPeak6_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak6_1.text()),float(self.LEPeak6_2.text())), orientation='vertical', span=(0,1),brush =(253,187,132,100)))
+            if int(self.combobox.currentIndex()) >= 6:
+                self.line_Text6.setPlainText((f"{(CalcArea(float(self.LEPeak7_1.text()),float(self.LEPeak7_2.text()),Data,Temperature)):.4g}"))
+                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak7_1.text()),float(self.LEPeak7_2.text())), orientation='vertical', span=(0,1),brush =(253,212,158,100)))
+        except Exception as e:
+                         dlg = QMessageBox(self)
+                         dlg.setWindowTitle("Error!")
+                         dlg.setText(f"An error occured: {e}, resetting values...")
+                         dlg.exec()
+
+    def ReCalc(self):
+        print("Wow!")
+        
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    ex = App()
+    sys.exit(app.exec_())
