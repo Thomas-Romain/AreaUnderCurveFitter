@@ -9,7 +9,7 @@ Created on Tue Oct 27 19:11:17 2026
 
 import sys
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QCheckBox, QComboBox, QGridLayout, QMainWindow, QApplication, QTextEdit, QLineEdit,  QWidget, QTabWidget, QVBoxLayout, QLabel,QPushButton, QMessageBox
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QGridLayout, QMainWindow, QApplication, QTextEdit, QLineEdit,  QWidget, QTabWidget, QVBoxLayout, QLabel,QPushButton, QMessageBox,QFileDialog
 import numpy as np
 import matplotlib.pyplot as plt
 import pyqtgraph as pg
@@ -20,12 +20,25 @@ def ImportFile(File):
         if File.rsplit('.', 1)[1] == "csv":
             print("OK!")
             Data = np.genfromtxt(File, delimiter=',', skip_header = 1)
+            if np.isnan(Data[0][0]) == True:
+                print("Error!")
+                try:
+                    Data = np.genfromtxt(File, delimiter=',', skip_header = 1, usecols=(1,2),missing_values=0)
+                except:
+                    print("Error reading data")
         if File.rsplit('.',1)[1] == 'txt':
             Data = np.genfromtxt(rf"{File}")
         Temperature = Data[:,0]
     except Exception as e:
                      print(f"Error! {e}")
-                     print("Check filetype before running again")
+                     print("Running backup attempt...")
+                     try:
+                          Data = np.genfromtxt(File, delimiter=',', skip_header = 1, usecols=(1,2),missing_values=0)
+                     except Exception as e:
+                                      print(f"Error! {e}")
+                                      print("Check filetype before running again")
+                                      Data = np.array([(40,-0.08099),(40.08899,-0.08099),(40.17798,-0.08099),(42.75862,-0.08099),(42.84761,-0.08099),(49.4327,-0.08094),(111.10122,-0.08099),(115.72859,-0.08099),(120,-0.08099)])
+                                      Temperature = Data[:,0]
     return Data[:,1], Temperature
 
 def BaseAdjust(Base1,Base2, Temperature,Data):
@@ -48,7 +61,13 @@ def BaseAdjust(Base1,Base2, Temperature,Data):
     return Data
 
 def CalcArea(Peak1,Peak2,Data,Temperature):
-    return simpson(Data[np.where(Temperature >= Peak1)[0][0]:np.where(Temperature >= Peak2)[0][0]], dx=5)        
+    try:
+        AreaCalculated = simpson(Data[np.where(Temperature >= Peak1)[0][0]:np.where(Temperature >= Peak2)[0][0]], dx=5)   
+    except Exception as e:
+        print(f"Error! {e}")
+        print("Value of limit 1 and limit 2 are equal. Avoid this if possible")
+        AreaCalculated=0
+    return AreaCalculated
 
 # Creating the main window     
 class App(QMainWindow):
@@ -76,10 +95,10 @@ class MyTabWidget(QWidget):
         self.tabs.addTab(self.tab1, "Graph stuff")
        
         #Submit button
-        self.SubmitButton2 = QPushButton("Plot graph", self)
-        self.SubmitButton2.clicked.connect(self.submit2)  
+        self.SubmitButton2 = QPushButton("Load file", self)
+        self.SubmitButton2.clicked.connect(self.ReCalc)  
         self.SubmitButtonReCalc = QPushButton("Recalculate",self)
-        self.SubmitButtonReCalc.clicked.connect(self.ReCalc)
+        self.SubmitButtonReCalc.clicked.connect(self.submit2)
         
         #Combobox1
         self.combobox = QComboBox(self)
@@ -118,20 +137,20 @@ class MyTabWidget(QWidget):
 
         
         #Masks
-        self.LEPeak1_1.setInputMask("000")
-        self.LEPeak1_2.setInputMask("000")
-        self.LEPeak2_1.setInputMask("000")
-        self.LEPeak2_2.setInputMask("000")
-        self.LEPeak3_1.setInputMask("000")
-        self.LEPeak3_2.setInputMask("000")
-        self.LEPeak4_1.setInputMask("000")
-        self.LEPeak4_2.setInputMask("000")
-        self.LEPeak5_1.setInputMask("000")
-        self.LEPeak5_2.setInputMask("000")
-        self.LEPeak6_1.setInputMask("000")
-        self.LEPeak6_2.setInputMask("000")
-        self.LEPeak7_1.setInputMask("000")
-        self.LEPeak7_2.setInputMask("000")
+        self.LEPeak1_1.setInputMask("999.99")
+        self.LEPeak1_2.setInputMask("999.99")
+        self.LEPeak2_1.setInputMask("999.99")
+        self.LEPeak2_2.setInputMask("999.99")
+        self.LEPeak3_1.setInputMask("999.99")
+        self.LEPeak3_2.setInputMask("999.99")
+        self.LEPeak4_1.setInputMask("999.99")
+        self.LEPeak4_2.setInputMask("999.99")
+        self.LEPeak5_1.setInputMask("999.99")
+        self.LEPeak5_2.setInputMask("999.99")
+        self.LEPeak6_1.setInputMask("999.99")
+        self.LEPeak6_2.setInputMask("999.99")
+        self.LEPeak7_1.setInputMask("999.99")
+        self.LEPeak7_2.setInputMask("999.99")
 
         
         #Peak labels
@@ -168,10 +187,10 @@ class MyTabWidget(QWidget):
         self.Xlim2 = QLineEdit("120",self)
         self.Xlim1.setInputMask("999")
         self.Xlim2.setInputMask("999")
-        self.Ylim1 = QLineEdit("-80",self)
-        self.Ylim2 = QLineEdit("80", self)
-        self.Ylim1.setInputMask("0.99")
-        self.Ylim2.setInputMask("0.99")
+        self.Ylim1 = QLineEdit("0.08",self)
+        self.Ylim2 = QLineEdit("0.08", self)
+        self.Ylim1.setInputMask("999.99")
+        self.Ylim2.setInputMask("999.99")
         
         #Checkbox
         self.Checkbox = QCheckBox("Baseline adjust?", self)
@@ -186,12 +205,19 @@ class MyTabWidget(QWidget):
         #Plot Widget?
         self.plot_widget = pg.PlotWidget()
         
-
+        #Line for errors?
+        self.ErrorLine = QTextEdit(self)
+        self.ErrorLine.setReadOnly(True)
+        
         # Create layout
         vbox = QGridLayout()
         
         vbox.addWidget(self.plot_widget, 0,4,12,2)
-        self.line_Text.setMaximumHeight(2500),self.line_Text.setMaximumWidth(5000)
+        # self.line_Text.setMaximumHeight(2500),self.line_Text.setMaximumWidth(5000)
+        
+        vbox.addWidget(self.ErrorLine, 12,0,1,6)
+        self.ErrorLine.setMaximumHeight(25),self.line_Text.setMaximumWidth(500)
+        
         vbox.addWidget(self.l2, 2,0)
         vbox.addWidget(self.l3, 3,0)
         vbox.addWidget(self.l4, 4,0)
@@ -263,6 +289,55 @@ class MyTabWidget(QWidget):
         self.submit2()
 
     def submit2(self):
+        def regionUpdated(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak1_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak1_2.setText(str(f"{hi:.2f}"))
+            self.line_Text.setPlainText((f"{(CalcArea(float(self.LEPeak1_1.text()),float(self.LEPeak1_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+        
+        def regionUpdated2(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak2_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak2_2.setText(str(f"{hi:.2f}")) 
+            self.line_Text1.setPlainText((f"{(CalcArea(float(self.LEPeak2_1.text()),float(self.LEPeak2_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+        
+        def regionUpdated3(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak3_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak3_2.setText(str(f"{hi:.2f}")) 
+            self.line_Text2.setPlainText((f"{(CalcArea(float(self.LEPeak3_1.text()),float(self.LEPeak3_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+        
+        def regionUpdated4(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak4_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak4_2.setText(str(f"{hi:.2f}")) 
+            self.line_Text3.setPlainText((f"{(CalcArea(float(self.LEPeak4_1.text()),float(self.LEPeak4_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+        
+        def regionUpdated5(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak5_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak5_2.setText(str(f"{hi:.2f}")) 
+            self.line_Text4.setPlainText((f"{(CalcArea(float(self.LEPeak5_1.text()),float(self.LEPeak5_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+        
+        def regionUpdated6(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak6_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak6_2.setText(str(f"{hi:.2f}"))
+            self.line_Text5.setPlainText((f"{(CalcArea(float(self.LEPeak6_1.text()),float(self.LEPeak6_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+        
+        def regionUpdated7(regionItem):
+            lo,hi = regionItem.getRegion()
+            self.LEPeak7_1.setText(str(f"{lo:.2f}")) 
+            self.LEPeak7_2.setText(str(f"{hi:.2f}"))
+            self.line_Text6.setPlainText((f"{(CalcArea(float(self.LEPeak7_1.text()),float(self.LEPeak7_2.text()),Data,Temperature)):.4g}"))
+            return regionItem.getRegion()
+           
         pltt = self.plot_widget
         pltt.clear()
         try:
@@ -285,39 +360,74 @@ class MyTabWidget(QWidget):
                     pltt.setYRange(min(Data[np.where(Temperature>=int(self.Xlim1.text()))[0][0]:np.where(Temperature>=int(self.Xlim2.text()))[0][0]]),max(Data[np.where(Temperature>=int(self.Xlim1.text()))[0][0]:np.where(Temperature>=int(self.Xlim2.text()))[0][0]]))
                 except:
                     print("Error!")
+                    self.ErrorLine.setPlainText("Error!")
             else:
                 pltt.setXRange(float(self.Xlim1.text()),float(self.Xlim2.text()))
                 pltt.setYRange(float(self.Ylim1.text())*-1,float(self.Ylim2.text()))
             if int(self.combobox.currentIndex()) >= 0:
                 self.line_Text.setPlainText((f"{(CalcArea(float(self.LEPeak1_1.text()),float(self.LEPeak1_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak1_1.text()),float(self.LEPeak1_2.text())), orientation='vertical', span=(0,1),brush =(127,0,0,100)))
+                LR = pg.LinearRegionItem(values=(float(self.LEPeak1_1.text()),float(self.LEPeak1_2.text())), orientation='vertical', span=(0,1),brush =(127,0,0,100))
+                pltt.addItem(LR)
+                LR.sigRegionChanged.connect(regionUpdated)
             if int(self.combobox.currentIndex()) >= 1:
                 self.line_Text1.setPlainText((f"{(CalcArea(float(self.LEPeak2_1.text()),float(self.LEPeak2_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak2_1.text()),float(self.LEPeak2_2.text())), orientation='vertical', span=(0,1),brush =(179,0,0,100)))
+                LR1 = pg.LinearRegionItem(values=(float(self.LEPeak2_1.text()),float(self.LEPeak2_2.text())), orientation='vertical', span=(0,1),brush =(179,0,0,100))
+                pltt.addItem(LR1)
+                LR1.sigRegionChanged.connect(regionUpdated2)
             if int(self.combobox.currentIndex()) >= 2:
                 self.line_Text2.setPlainText((f"{(CalcArea(float(self.LEPeak3_1.text()),float(self.LEPeak3_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak3_1.text()),float(self.LEPeak3_2.text())), orientation='vertical', span=(0,1),brush =(215,48,31,100)))
+                LR2 = pg.LinearRegionItem(values=(float(self.LEPeak3_1.text()),float(self.LEPeak3_2.text())), orientation='vertical', span=(0,1),brush =(215,48,31,100))
+                pltt.addItem(LR2)
+                LR2.sigRegionChanged.connect(regionUpdated3)            
             if int(self.combobox.currentIndex()) >= 3:
                 self.line_Text3.setPlainText((f"{(CalcArea(float(self.LEPeak4_1.text()),float(self.LEPeak4_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak4_1.text()),float(self.LEPeak4_2.text())), orientation='vertical', span=(0,1),brush =(239,101,72,100)))
+                LR3 = pg.LinearRegionItem(values=(float(self.LEPeak4_1.text()),float(self.LEPeak4_2.text())), orientation='vertical', span=(0,1),brush =(239,101,72,100))
+                pltt.addItem(LR3)
+                LR3.sigRegionChanged.connect(regionUpdated4) 
             if int(self.combobox.currentIndex()) >= 4:
                 self.line_Text4.setPlainText((f"{(CalcArea(float(self.LEPeak5_1.text()),float(self.LEPeak5_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak5_1.text()),float(self.LEPeak5_2.text())), orientation='vertical', span=(0,1),brush =(252,141,89,100)))
+                LR4 = pg.LinearRegionItem(values=(float(self.LEPeak5_1.text()),float(self.LEPeak5_2.text())), orientation='vertical', span=(0,1),brush =(252,141,89,100))
+                pltt.addItem(LR4)
+                LR4.sigRegionChanged.connect(regionUpdated5)             
             if int(self.combobox.currentIndex()) >= 5:
                 self.line_Text5.setPlainText((f"{(CalcArea(float(self.LEPeak6_1.text()),float(self.LEPeak6_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak6_1.text()),float(self.LEPeak6_2.text())), orientation='vertical', span=(0,1),brush =(253,187,132,100)))
+                LR5 = pg.LinearRegionItem(values=(float(self.LEPeak6_1.text()),float(self.LEPeak6_2.text())), orientation='vertical', span=(0,1),brush =(253,187,132,100))
+                pltt.addItem(LR5)
+                LR5.sigRegionChanged.connect(regionUpdated6) 
             if int(self.combobox.currentIndex()) >= 6:
                 self.line_Text6.setPlainText((f"{(CalcArea(float(self.LEPeak7_1.text()),float(self.LEPeak7_2.text()),Data,Temperature)):.4g}"))
-                pltt.addItem(pg.LinearRegionItem(values=(float(self.LEPeak7_1.text()),float(self.LEPeak7_2.text())), orientation='vertical', span=(0,1),brush =(253,212,158,100)))
+                LR6 = pg.LinearRegionItem(values=(float(self.LEPeak7_1.text()),float(self.LEPeak7_2.text())), orientation='vertical', span=(0,1),brush =(253,212,158,100))
+                pltt.addItem(LR6)
+                LR6.sigRegionChanged.connect(regionUpdated7)         
         except Exception as e:
                          dlg = QMessageBox(self)
                          dlg.setWindowTitle("Error!")
                          dlg.setText(f"An error occured: {e}, resetting values...")
                          dlg.exec()
+                         self.ErrorLine.setPlainText(f"Error! {e}")
 
     def ReCalc(self):
         print("Wow!")
-        
+        try:
+            # dialog = QFileDialog(self)
+            # dialog.
+            # dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+          file_dialog = QFileDialog(self)
+          file_dialog.setNameFilter("CSV (*.csv);;Text files (*.txt)")
+          file_dialog.setWindowTitle("Open File")
+          file_dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+          file_dialog.setViewMode(QFileDialog.ViewMode.Detail)
+          if file_dialog.exec():
+             selected_files = file_dialog.selectedFiles()
+             print("Selected File:", selected_files[0])
+             self.line_edit.setText(f"{selected_files[0]}")
+             self.submit2()
+        except Exception as e:
+                          dlg = QMessageBox(self)
+                          dlg.setWindowTitle("Error!")
+                          dlg.setText(f"An error occured: {e}, resetting values...")
+                          dlg.exec()
+                          self.ErrorLine.setPlainText(f"Error! {e}")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
